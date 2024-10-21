@@ -28,9 +28,14 @@ namespace YouTubePronunciationFinder
             panelBrowser.Controls.Add(browser);
         }
 
+        private string LoadApiKey()
+        {
+            return System.IO.File.ReadAllText("apiKey.txt").Trim();
+        }
+
         private async Task SearchYouTube(string query)
         {
-            string apiKey = "YOUR_API_KEY"; // Replace with your API key
+            string apiKey = LoadApiKey(); // Load API key from the text file
             string url = $"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query} pronunciation&type=video&key={apiKey}";
 
             using (HttpClient client = new HttpClient())
