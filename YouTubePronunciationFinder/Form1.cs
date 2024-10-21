@@ -5,6 +5,7 @@ using System.Windows.Forms;
 using Newtonsoft.Json.Linq;
 using CefSharp;
 using CefSharp.WinForms;
+using System.IO;
 
 namespace YouTubePronunciationFinder
 {
@@ -30,26 +31,69 @@ namespace YouTubePronunciationFinder
 
         private string LoadApiKey()
         {
-            return System.IO.File.ReadAllText("apiKey.txt").Trim();
+            string filePath = "apiKey.txt";
+
+            if (!File.Exists(filePath))
+            {
+                throw new FileNotFoundException("API key file not found. Please create 'apiKey.txt' with your API key.");
+            }
+
+            string apiKey = File.ReadAllText(filePath).Trim();
+
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                throw new InvalidOperationException("API key is empty. Please ensure 'apiKey.txt' contains a valid key.");
+            }
+
+            return apiKey;
         }
 
         private async Task SearchYouTube(string query)
         {
-            string apiKey = LoadApiKey(); // Load API key from the text file
+            string apiKey;
+
+            try
+            {
+                apiKey = LoadApiKey(); // Load API key
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return; // Exit the method if the API key is not valid
+            }
+
             string url = $"https://www.googleapis.com/youtube/v3/search?part=snippet&q={query} pronunciation&type=video&key={apiKey}";
 
             using (HttpClient client = new HttpClient())
             {
-                var response = await client.GetStringAsync(url);
-                var json = JObject.Parse(response);
-
-                lstResults.Items.Clear();
-
-                foreach (var item in json["items"])
+                try
                 {
-                    string title = item["snippet"]["title"].ToString();
-                    string videoId = item["id"]["videoId"].ToString();
-                    lstResults.Items.Add(new { Title = title, VideoId = videoId });
+
+                    var response = await client.GetStringAsync(url);
+                    var json = JObject.Parse(response);
+
+                    lstResults.Items.Clear();
+
+                    foreach (var item in json["items"])
+                    {
+                        string title = item["snippet"]["title"].ToString();
+                        string videoId = item["id"]["videoId"].ToString();
+                        string description = item["snippet"]["description"].ToString();
+
+                        // Check if the description contains the query word
+                        if (description.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            lstResults.Items.Add(new { Title = title, VideoId = videoId });
+                        }
+                    }
+                }
+                catch (HttpRequestException httpEx)
+                {
+                    MessageBox.Show($"HTTP Request failed: {httpEx.Message} \n it may be caused by missing apiKey", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"An error occurred: {ex.Message} \n it may be caused by missing apiKey", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
         }
